@@ -1,6 +1,7 @@
 """最小プレイ可能UI（CLI）と事件検証（Issue #5）。
 
 ``sql-detective play``   1事件を通しで遊ぶ
+``sql-detective debug``  開発用モードで事件を調べる
 ``sql-detective verify`` 生成事件N件の一意解チェック
 """
 
@@ -12,7 +13,12 @@ import tempfile
 import unicodedata
 from pathlib import Path
 
-from .case import TEMPLATES, CaseGenerationError, generate_case, verify_case_db
+from .case import (
+    TEMPLATES,
+    CaseGenerationError,
+    generate_case,
+    verify_case_db,
+)
 from .db import TABLE_COLUMNS, TABLE_ORDER, QueryRejected, QueryTimeout
 from .game import MAX_QUERIES, Game, LossReason, Phase
 
@@ -105,6 +111,76 @@ def _print_ending(game: Game) -> None:
     print(RULE)
 
 
+# --- 開発用コマンド ---------------------------------------------------------
+
+
+def _print_debug_help() -> None:
+    print("\n【デバッグコマンド】")
+    print("  :status       シード・事件・状態と捜査履歴を表示")
+    print("  :answer       犯人と一意性検証SQLを表示（ネタバレ）")
+    print("  :verify       現在のDBで一意解を検証（ネタバレ）")
+    print("  :budget N     残り捜査コストを N に変更（0〜初期値）")
+    print("  :reset        同じ事件を初期状態に戻す（履歴も消去）")
+    print("  :help         この一覧を表示")
+    print("  終了後も :reset で同じ事件を再開できます。空行で終了。")
+
+
+def _debug_command(game: Game, line: str) -> None:
+    """明示的にデバッグモードを選んだ場合だけ呼び出す。"""
+    parts = line.split()
+    command = parts[0].lower()
+    if command == ":help" and len(parts) == 1:
+        _print_debug_help()
+    elif command == ":status" and len(parts) == 1:
+        case = game.case
+        print(f"  シード: {case.seed} / 生成再試行: {case.attempt}")
+        print(f"  事件: {case.template.title} ({case.template.key})")
+        print(f"  状態: {game.phase.value} / 敗北理由: {game.loss_reason.value if game.loss_reason else 'なし'}")
+        print(f"  捜査コスト: 残り {game.budget_left}/{game.max_queries} / 使用 {game.queries_used}")
+        print(f"  捜査履歴: {len(game.history)}件")
+        for index, result in enumerate(game.history, 1):
+            print(f"    {index}. コスト{result.cost} / {result.row_count}行 / {result.elapsed_ms:.1f}ms: {result.sql}")
+    elif command == ":answer" and len(parts) == 1:
+        case = game.case
+        print(f"  【ネタバレ】犯人: {case.culprit_name}（ID {case.culprit_id}）")
+        print("  一意性検証SQL:")
+        print(case.template.predicate_sql.strip())
+    elif command == ":verify" and len(parts) == 1:
+        try:
+            matches = verify_case_db(game.db_path, game.case.template)
+        except (QueryRejected, QueryTimeout, OSError) as exc:
+            print(f"  一意性検証に失敗しました: {exc}")
+            return
+        valid = matches == [game.case.culprit_id]
+        print(f"  【ネタバレ】検証結果: {'一意' if valid else '不一致'} / 候補ID: {matches} / 犯人ID: {game.case.culprit_id}")
+    elif command == ":budget":
+        if len(parts) != 2:
+            print("  使い方: :budget N（0〜初期コスト）")
+            return
+        try:
+            remaining = int(parts[1])
+        except ValueError:
+            print("  残りコストには整数を指定してください。")
+            return
+        if not 0 <= remaining <= game.max_queries:
+            print(f"  残りコストは0〜{game.max_queries}で指定してください。")
+            return
+        if game.is_over:
+            print("  終了後は :reset で再開してから変更してください。")
+            return
+        game.queries_used = game.max_queries - remaining
+        print(f"  残り捜査コストを {remaining} に変更しました。履歴はそのままです。")
+    elif command == ":reset" and len(parts) == 1:
+        game.queries_used = 0
+        game.history.clear()
+        game.phase = Phase.BRIEFING
+        game.loss_reason = None
+        print(f"  シード {game.case.seed} の同じ事件を初期状態に戻しました。")
+        _print_brief(game)
+    else:
+        print("  不明なデバッグコマンドです。:help で一覧を表示します。")
+
+
 # --- play -------------------------------------------------------------------
 
 
@@ -116,7 +192,10 @@ def _read_line(prompt: str) -> str:
 
 
 def _play(args: argparse.Namespace) -> int:
+    debug = args.command == "debug"
     _print_header()
+    if debug:
+        print("  【デバッグモード】答えや検証SQLを表示できます。")
     try:
         game = Game.new(seed=args.seed)
     except CaseGenerationError as exc:
@@ -127,16 +206,26 @@ def _play(args: argparse.Namespace) -> int:
         _print_brief(game)
         _print_schema()
         print("\n  クエリを入力（空行で終了 / 'accuse' で告発 / 'help' で説明 / 'hint' でヒント）")
+        if debug:
+            print(f"  シード: {game.case.seed}（再現用） / :help でデバッグコマンド一覧")
 
-        while not game.is_over:
+        while debug or not game.is_over:
             _print_status(game)
-            if not game.can_investigate:
+            if game.is_over:
+                print("  事件は終了しています。:reset で再開できます。")
+            elif not game.can_investigate:
                 print("  ※ 捜査コストは残っていません。告発してください。")
             line = _read_line("\nsql> ").strip()
 
             if not line:
                 print("  終了します。")
                 return 0
+            if debug and line.startswith(":"):
+                _debug_command(game, line)
+                continue
+            if game.is_over:
+                print("  事件は終了しています。:reset で再開してください。")
+                continue
             if line.lower() in ("help", "?", "\\h"):
                 _print_schema()
                 continue
@@ -152,6 +241,8 @@ def _play(args: argparse.Namespace) -> int:
                 _print_ending(game)
                 if not result.correct:
                     print(f"  あなたの告発: {result.accused}")
+                if debug:
+                    continue
                 return 0
 
             try:
@@ -162,6 +253,8 @@ def _play(args: argparse.Namespace) -> int:
             except RuntimeError as exc:
                 print(f"  ✗ {exc}")
                 _print_ending(game)
+                if debug:
+                    continue
                 return 0
 
             _print_result(result, len(game.history))
@@ -228,6 +321,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--seed", type=int, default=None, help="事件のシード（省略時はランダム）"
     )
     play.set_defaults(func=_play)
+
+    debug = sub.add_parser("debug", help="開発用モードで事件を調べる（ネタバレあり）")
+    debug.add_argument(
+        "--seed", type=int, default=None, help="再現する事件のシード（省略時はランダム）"
+    )
+    debug.set_defaults(func=_play)
 
     verify = sub.add_parser("verify", help="生成事件の一意解チェック")
     verify.add_argument(
