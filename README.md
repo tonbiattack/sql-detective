@@ -67,8 +67,6 @@ python -m pytest
 - 捜査コストは8回。`LIMIT` なしの全件取得はコスト2倍
 - 告発は無料。外すと即終了
 
-詳細は [docs/SPEC.md](docs/SPEC.md) を参照。
-
 ## 仕様書
 
 詳細は [docs/SPEC.md](docs/SPEC.md) を参照。
