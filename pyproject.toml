@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sql-detective"
+version = "0.1.0"
+description = "SQL探偵：ログの死角 — ランダム生成ログDBで犯人を当てる推理ゲーム"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+sql-detective = "sql_detective.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sql_detective*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
