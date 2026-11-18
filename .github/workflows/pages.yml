@@ -8,6 +8,12 @@ on:
       - "sql_detective/**"
       - "tests/**"
       - ".github/workflows/pages.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - "sql_detective/**"
+      - "tests/**"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -51,6 +57,7 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
