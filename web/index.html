@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18344a">
+  <title>SQL探偵：ログの死角</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#game-content">捜査画面へ移動</a>
+  <div id="app" class="app-shell">
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="site-title" href="./" aria-label="SQL探偵：ログの死角">
+          <span class="site-title__mark" aria-hidden="true">探</span>
+          <span><strong>SQL探偵</strong><small>ログの死角</small></span>
+        </a>
+        <span class="site-header__note">証拠を読み、真相に迫る。</span>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div id="loading" class="loading" role="status">事件を読み込んでいます。</div>
+      <noscript><p class="notice">このゲームを遊ぶには、JavaScriptを有効にしてください。</p></noscript>
+
+      <div id="game-content" hidden>
+        <section class="case-file" aria-labelledby="case-title">
+          <div class="case-file__topline">
+            <span class="case-file__label">事件ファイル</span>
+            <span class="case-file__number">事件 <span id="case-number">—</span></span>
+          </div>
+          <div class="case-file__body">
+            <div class="case-file__copy">
+              <h1 id="case-title">事件を読み込み中</h1>
+              <p id="case-brief" class="case-brief"></p>
+              <p id="case-note" class="case-note"></p>
+            </div>
+            <div class="case-file__seal" aria-hidden="true">捜査<br>開始</div>
+          </div>
+          <div class="case-file__footer">
+            <p>自分でSQLを書かずに調べ、証拠を比べ、犯人を告発しましょう。</p>
+            <button id="reset-button" class="secondary-button reset-button" type="button">最初からやり直す</button>
+          </div>
+        </section>
+
+        <section class="investigation-overview" aria-label="捜査の進み具合">
+          <div class="overview-metric overview-metric--remaining">
+            <span class="overview-metric__label">残りの捜査コスト</span>
+            <strong id="remaining" class="overview-metric__value">—</strong>
+          </div>
+          <div class="overview-metric">
+            <span class="overview-metric__label">確認した証拠</span>
+            <strong id="evidence-count" class="overview-metric__value">—</strong>
+          </div>
+          <div class="overview-metric">
+            <span class="overview-metric__label">容疑者</span>
+            <strong id="candidate-count" class="overview-metric__value">—</strong>
+          </div>
+          <p class="overview-rule">証拠の初回閲覧は1件につき1コスト。再閲覧は無料です。<br>正解時は最大100点から閲覧した証拠1枚につき20点減点。誤告発は0点です。</p>
+        </section>
+
+        <div class="investigation-grid">
+          <section class="workspace-section evidence-section" aria-labelledby="evidence-heading">
+            <div class="section-heading">
+              <div>
+                <span class="section-heading__step" aria-hidden="true">01</span>
+                <h2 id="evidence-heading">証拠を調べる</h2>
+              </div>
+              <p>気になる記録を開いて、手がかりを探しましょう。</p>
+            </div>
+            <div id="evidence-list" class="evidence-list"></div>
+          </section>
+
+          <section class="workspace-section suspect-section" aria-labelledby="suspect-heading">
+            <div class="section-heading">
+              <div>
+                <span class="section-heading__step" aria-hidden="true">02</span>
+                <h2 id="suspect-heading">容疑者を選ぶ</h2>
+              </div>
+              <p>証拠を比べ、犯人だと思う人物を1人選びます。</p>
+            </div>
+            <div id="suspect-list" class="suspect-list"></div>
+            <div class="accusation">
+              <p class="accusation__label">告発する人物</p>
+              <p id="selection-summary" class="selection-summary" aria-live="polite">容疑者を選んでください。</p>
+              <button id="accuse-button" class="primary-button accusation__button" type="button" disabled>この人物を告発する</button>
+              <p class="accusation__note">告発は無料。間違えると0点です。</p>
+            </div>
+          </section>
+        </div>
+
+        <section id="result-panel" class="result-panel" aria-labelledby="result-title" tabindex="-1" hidden>
+          <div class="result-panel__heading">
+            <span class="result-panel__stamp" aria-hidden="true">判定</span>
+            <h2 id="result-title">捜査結果</h2>
+          </div>
+          <p id="result-text" class="result-text"></p>
+          <div id="result-proof" class="result-proof"></div>
+          <div class="result-actions">
+            <button id="retry-button" class="secondary-button" type="button">同じ事件をもう一度</button>
+            <button id="next-button" class="primary-button" type="button">次の事件へ</button>
+          </div>
+        </section>
+      </div>
+      <div id="feedback" class="feedback" role="status" aria-live="polite" aria-atomic="true"></div>
+    </main>
+    <footer class="site-footer">SQL探偵：ログの死角</footer>
+  </div>
+</body>
+</html>

@@ -6,3 +6,7 @@ build/
 dist/
 *.db
 .venv/
+
+# ローカル確認用
+.shots/
+.server.pid
