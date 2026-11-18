@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SQL探偵">
+  <rect width="64" height="64" rx="10" fill="#18344a"/>
+  <circle cx="27" cy="27" r="13" fill="none" stroke="#ead5aa" stroke-width="4"/>
+  <line x1="37" y1="37" x2="50" y2="50" stroke="#ead5aa" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="27" cy="27" r="4" fill="#ad7b31"/>
+</svg>

@@ -1,126 +1,159 @@
-# SQL探偵：ログの死角（sql-detective）
+# SQL探偵：ログの死角
 
-ランダム生成ログDBで犯人を当てる推理ゲーム。
+**ランダム生成されたログDBから、証拠をたどって犯人を1人告発する推理ゲーム。**
 
-> ステータス: **MVP実装済み**（CLIで1事件を通しで遊べる）
+[![Deploy](https://github.com/tonbiattack/sql-detective/actions/workflows/pages.yml/badge.svg)](https://github.com/tonbiattack/sql-detective/actions/workflows/pages.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-229%20passed-brightgreen)](tests)
 
-## コンセプト
+> **ブラウザで遊ぶ:** https://tonbiattack.github.io/sql-detective/
 
-毎回ランダム生成される注文／ログイン／送金ログのDBから、JOINと集計で容疑者を絞り、犯人を1人告発する。不完全な情報を読むことがそのまま推理になる。
+注文・ログイン・送金のログから、条件に合う人物を絞り込み、真犯人を当てます。
+証拠を開くたびに候補が減り、少ない証拠で当てるほど高得点。SQLを書かなくても遊べます。
+
+---
+
+## 特徴
+
+- **毎回ちがう事件** — シードからログDBを生成。同じシードなら同じ事件を再現できる
+- **解は必ず1人** — 生成のたびに検証クエリで一意性を確認し、複数解の事件は出さない
+- **2つの遊び方** — ブラウザで証拠を選ぶモードと、CLIでSQLを書くモード
+- **サーバー不要** — 静的ファイルだけで動く。GitHub Pagesで公開
 
 ## 遊び方
 
-1. 依頼文が提示される（例: 深夜に不自然な送金がある）
-2. クエリを実行して容疑者を絞る（実行回数が捜査コスト）
-3. 容疑者を1人に絞れたら「告発」で判定
-4. 当たれば残りクエリ数がスコア、外せば即終了
+### ブラウザ版
 
-## セットアップ
+[公開URL](https://tonbiattack.github.io/sql-detective/) を開くだけです。インストールもログインも不要。
 
-Python 3.11+ が必要。実行時依存はなし（標準ライブラリのみ）。
+1. 事件の概要と容疑者10人が表示される
+2. 証拠カードを開くと、実際のSQLの実行結果が表で表示される
+3. 条件に合わない容疑者は自動で絞り込まれる
+4. 犯人だと思う人物を選んで告発
 
-```powershell
+証拠の初回閲覧は1枚につき1コスト。正解時は最大100点から閲覧1枚につき20点減点、誤告発は0点です。
+
+### CLI版（SQLを書いて遊ぶ）
+
+```bash
 python -m pip install -e .
-```
-
-## 使い方
-
-### 遊ぶ
-
-```powershell
 python -m sql_detective.cli play
 ```
 
-シードを固定すると同じ事件を再現できる。
+シードを固定すると同じ事件を再現できます。
 
-```powershell
+```bash
 python -m sql_detective.cli play --seed 3
 ```
-
-CLI内の操作:
 
 | 入力 | 動作 |
 |---|---|
 | `SELECT ...` | クエリを実行（捜査コストを消費） |
 | `accuse` | 告発モードに入る（無料） |
-| `help` | テーブル一覧を表示 |
 | `hint` | ヒントを表示 |
+| `help` | テーブル一覧を表示 |
 | 空行 | 終了 |
 
-### デバッグモード
-
-```powershell
-python -m sql_detective.cli debug --seed 3
-```
-
-通常の操作に加えて、以下の開発用コマンドを使える。シードを省略した場合は
-起動時に表示されたシードで同じ事件を再現できる。通常の `play` では使えない。
-
-| 入力 | 動作 |
-|---|---|
-| `:help` | デバッグコマンド一覧を表示 |
-| `:status` | シード、事件の種類、ゲーム状態、捜査履歴を表示 |
-| `:answer` | 犯人と一意性検証SQLを表示（ネタバレ） |
-| `:verify` | 現在のDBで一意性を検証（ネタバレ、捜査コストは消費しない） |
-| `:budget N` | 残り捜査コストを0〜初期値の整数に変更（履歴は保持） |
-| `:reset` | 同じ事件を初期状態に戻す（履歴・勝敗・コストもリセット） |
-
-勝敗が決まった後も終了せず、`:reset` で同じ事件をやり直せる。
-デバッグモードでもSQLは読み取り専用で、実行時間・取得行数の制限は通常どおり。
-
-### 事件の一意解チェック
-
-```powershell
-python -m sql_detective.cli verify --count 100
-```
-
-生成した事件N件すべてで「条件を満たすのが1人だけ」を検証する。
-
-### テスト
-
-```powershell
-python -m pytest
-```
-
-## ルール
+**ルール**
 
 - 実行できるのは `SELECT`（と `WITH`）のみ。DBは読み取り専用で開く
 - 1クエリ 100ms / 取得上限 100行
 - 捜査コストは8回。`LIMIT` なしの全件取得はコスト2倍
 - 告発は無料。外すと即終了
 
-## 仕様書
+### デバッグモード
 
-詳細は [docs/SPEC.md](docs/SPEC.md) を参照。
+```bash
+python -m sql_detective.cli debug --seed 3
+```
 
-## MVP範囲
+開発用に、シード・状態・捜査履歴の確認、犯人と検証SQLの表示、一意性検証、残りコストの変更、同一事件のリセットができます。通常の `play` では使えません。
 
-- 1プレイ完結型の最小コアループのみ
-- DBは SQLite
-- オンライン対戦・ランキングは対象外
+| 入力 | 動作 |
+|---|---|
+| `:status` | シード、事件、状態、捜査履歴を表示 |
+| `:answer` | 犯人と検証SQLを表示（ネタバレ） |
+| `:verify` | 現在のDBで一意性を検証（ネタバレ） |
+| `:budget N` | 残り捜査コストを変更 |
+| `:reset` | 同じ事件を初期状態に戻す |
 
-## 技術スタック
+## 仕組み
 
-- 言語: Python 3.11+
-- DB: SQLite（読み取り専用接続）
-- UI: CLI
-- テスト: pytest
+### 事件生成
 
-## 構成
+固定4テーブル（`users` / `orders` / `logins` / `transfers`）に、犯人が一意になるようデータを**逆算生成**します。生成後は必ず検証クエリを実行し、条件を満たすのが1人だけであることを確認。満たさなければ別シードで再生成します。
 
-| ファイル | 役割 |
+| 事件 | 決め手 |
+|---|---|
+| 深夜の送金 | 時刻と金額の複合条件 |
+| 同一IPからの連続失敗 | `user_id` × `ip` のグループ集計 |
+| 高額注文の連続 | `user_id` × 日付のグループ集計 |
+| 管理者への不自然な送金 | `users` への2回JOIN |
+
+各事件には**ニアミス**（条件を1つだけ外す容疑者）を混ぜています。条件を1つ落とすと複数人出るため、絞り込みが推理になります。
+
+### ブラウザ版のデータ
+
+Python側で事件を生成・検証し、証拠カードのSQLを実際に実行した結果を `web/cases.json` に書き出します。ブラウザはそのJSONを読むだけで、事件生成もDB実行もしません。
+
+答えはJSONに含めません。決め手の証拠が示す唯一の候補から導くため、データとロジックが食い違えばテストが落ちます。
+
+## 開発
+
+```bash
+# セットアップ
+python -m pip install -e .
+
+# Pythonのテスト
+python -m pytest
+
+# ブラウザ版のロジックテスト
+node web/logic.test.mjs
+
+# 事件データの再生成
+python -m sql_detective.web_cases --count 100
+
+# ローカルでブラウザ版を確認
+python -m http.server 8765 --directory web
+```
+
+ブラウザの実機確認（ヘッドレスChrome/Edgeで通しプレイ・スマホ幅・Consoleエラーを検証）:
+
+```bash
+node web/browser.test.mjs http://127.0.0.1:8765/index.html
+```
+
+### 構成
+
+| パス | 役割 |
 |---|---|
 | `sql_detective/db.py` | 読み取り専用クエリ実行基盤（SELECT限定・上限・コスト計測） |
 | `sql_detective/case.py` | 事件生成（一意解の逆算生成と検証） |
 | `sql_detective/game.py` | コアループ（捜査→告発→判定・スコア） |
-| `sql_detective/cli.py` | CLI UI と `verify` サブコマンド |
+| `sql_detective/cli.py` | CLI UI と `verify` / `debug` サブコマンド |
+| `sql_detective/web_cases.py` | ブラウザ版の証拠データ生成 |
+| `web/` | ブラウザ版（HTML/CSS/JS・事件データ） |
+| `tests/` | pytest によるテスト |
 
-## Issue方針
+### デプロイ
 
-- #1 [Epic/仕様確定] MVP仕様を確定する
-- #2 基盤（DB実行基盤）
-- #3 ロジック（コアループ実装）
-- #4 データ（生成）
-- #5 UI/検証（最小UIとプレイ検証）
+`main` に `web/` または `sql_detective/` の変更が入ると、GitHub Actions が検証してから GitHub Pages へ公開します。検証では pytest、事件データの再生成差分チェック、JSロジックテストを実行し、いずれかが失敗するとデプロイしません。
 
-各Issueは「目的・やること・受け入れ条件・対象外」で管理する。
+初回のみ、リポジトリの **Settings → Pages → Source** を **GitHub Actions** に設定してください。
+
+## 仕様
+
+詳細は [docs/SPEC.md](docs/SPEC.md) を参照してください。
+
+## コントリビュート
+
+Issue と Pull Request を歓迎します。
+
+1. 変更は小さく保ち、既存のテストを通してください
+2. 事件生成を変えたら `python -m sql_detective.web_cases --count 100` でデータを再生成してください
+3. 一意性が壊れていないことを `python -m sql_detective.cli verify --count 100` で確認してください
+
+## ライセンス
+
+[MIT](LICENSE)
